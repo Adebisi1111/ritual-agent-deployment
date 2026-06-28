@@ -1,1 +1,5 @@
 .env
+.kspass
+.env
+*.key
+*.pem

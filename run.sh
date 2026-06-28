@@ -137,7 +137,7 @@ deployed() { local c; c="$(rpc_read cast code "$HARNESS" --rpc-url "$RPC_URL")";
 
 ### ---------- keystore signer ----------
 KEYSTORE_DIR="$HOME/.foundry/keystores"
-KS_PASSWORD=""
+KS_PASSWORD="${RITUAL_PASSWORD:-}"
 
 # Read a secret showing one '*' per char (backspace supported) into REPLY_SECRET.
 read_masked() {
@@ -213,6 +213,14 @@ resolve_signer() {
 # Ask the keystore password once per run (masked), retrying up to 3 times if it is wrong.
 unlock() {
   [ -n "$KS_PASSWORD" ] && return 0
+  # Try reading password from .kspass file first
+  if [ -f "$HERE/.kspass" ]; then
+    local file_pw
+    file_pw="$(grep '^KS_PASS=' "$HERE/.kspass" | cut -d= -f2 | tr -d '\r\n')"
+    if [ -n "$file_pw" ] && cast wallet address --account "$KEYSTORE_ACCOUNT" --password "$file_pw" >/dev/null 2>&1; then
+      KS_PASSWORD="$file_pw"; return 0
+    fi
+  fi
   local i pw
   for i in 1 2 3; do
     read_masked "  keystore password: "; pw="$REPLY_SECRET"
@@ -509,7 +517,7 @@ print("EXECUTOR=" + executor)
 print("CONFIG_CALLDATA=0x" + data.hex())
 PY
   spin 3 "discover executor, encrypt secret, encode calldata" \
-    uv run --quiet --with eciespy --with eth-abi --with web3 python3 "$PYTMP"
+    uv run --quiet --with eciespy --with eth-abi --with web3 python "$PYTMP"
   rm -f "$PYTMP"
   local OUT EXECUTOR CONFIG_CALLDATA
   OUT="$(cat "$LOGFILE")"
